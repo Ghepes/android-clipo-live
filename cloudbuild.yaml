@@ -1,0 +1,105 @@
+steps:
+  - name: gcr.io/cloud-builders/gsutil
+    args:
+      - cp
+      - 'gs://$_BUCKET/$_OBJECT'
+      - input.zip
+  - name: bash
+    args:
+      - bash
+      - '-c'
+      - unzip -o input.zip
+  - name: 'ubuntu:22.04'
+    env:
+      - DEBIAN_FRONTEND=noninteractive
+    args:
+      - '-c'
+      - >
+        echo "--- 1. Installing Tools ---"
+
+        apt-get update -qq && apt-get install -y openjdk-17-jdk wget unzip zip
+        -qq
+
+
+        echo "--- 2. Generating Key (release-key.jks) ---"
+
+        keytool -genkey -v -keystore release-key.jks -keyalg RSA \
+
+        -keysize 2048 -validity 10000 -alias key0 \
+
+        -dname "CN=AndroidApp, OU=IT, O=Auto, L=Web, C=AT" \
+
+        -storepass android -keypass android
+
+
+        echo "--- 3. Creating key.properties ---"
+
+        echo "storePassword=android" > key.properties
+
+        echo "keyPassword=android" >> key.properties
+
+        echo "keyAlias=key0" >> key.properties
+
+        echo "storeFile=release-key.jks" >> key.properties
+
+
+        echo "--- 4. Setup SDK Android ---"
+
+        mkdir -p /workspace/android-sdk/cmdline-tools
+
+        wget -q
+        https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
+        -O tools.zip
+
+        unzip -q tools.zip -d /workspace/android-sdk/cmdline-tools
+
+        mv /workspace/android-sdk/cmdline-tools/cmdline-tools
+        /workspace/android-sdk/cmdline-tools/latest
+
+
+        export ANDROID_HOME=/workspace/android-sdk
+
+        export
+        PATH=$$PATH:$$ANDROID_HOME/cmdline-tools/latest/bin:$$ANDROID_HOME/platform-tools
+
+
+        echo "--- 5. License Gradle ---"
+
+        yes | sdkmanager --licenses > /dev/null
+
+        sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        > /dev/null
+
+        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+
+        unzip -q gradle-8.5-bin.zip
+
+
+        echo "--- 6. FINAL COMPILATION ---"
+
+        # Compile Release (automatically signed via key.properties)
+
+        ./gradle-8.5/bin/gradle bundleRelease assembleRelease
+        -Dsdk.dir=/workspace/android-sdk
+    entrypoint: bash
+  - name: 'ubuntu:22.04'
+    args:
+      - bash
+      - '-c'
+      - |
+        # IMPORTANT: Reinstall zip for APK packaging step
+        apt-get update -qq && apt-get install -y zip -qq
+
+        echo "We make the final package..."
+        # Arhivăm rezultatele
+        zip -j final-app.zip \
+          app/build/outputs/bundle/release/app-release.aab \
+          app/build/outputs/apk/release/app-release.apk \
+          release-key.jks
+options:
+  logging: CLOUD_LOGGING_ONLY
+artifacts:
+  objects:
+    location: 'gs://$_OUTPUT_BUCKET/APK/$BUILD_ID/'
+    paths:
+      - final-app.zip
