@@ -97,7 +97,7 @@ steps:
           app/build/outputs/apk/release/app-release.apk \
           release-key.jks
 options:
-  logging: NONE # CLOUD_LOGGING_ONLY
+  logging: CLOUD_LOGGING_ONLY
 artifacts:
   objects:
     location: 'gs://$_OUTPUT_BUCKET/APK/$BUILD_ID/'
