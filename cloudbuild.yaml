@@ -96,6 +96,11 @@ steps:
           app/build/outputs/bundle/release/app-release.aab \
           app/build/outputs/apk/release/app-release.apk \
           release-key.jks
+          FILENAME=$(basename "$_OBJECT")
+        UID_USER=$(echo "$FILENAME" | cut -d'_' -f1)
+        FINAL_LINK="https://storage.googleapis.com/$_OUTPUT_BUCKET/APK/$BUILD_ID/final-app.zip"
+        echo "[{\"build_id\":\"$BUILD_ID\", \"download_url\":\"$FINAL_LINK\"}]" > history.json
+        gsutil cp history.json "gs://$_OUTPUT_BUCKET/users/$UID_USER/history_$BUILD_ID.json"
 options:
   logging: CLOUD_LOGGING_ONLY
 artifacts:
