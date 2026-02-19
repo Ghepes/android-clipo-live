@@ -87,35 +87,30 @@ steps:
       - bash
       - '-c'
       - |
-        echo "=> Incepem generarea istoricului..."
-        
-        # 1. Generam link-ul final
-        MY_LINK="https://storage.googleapis.com/$_OUTPUT_BUCKET/APK/$BUILD_ID/final-app.zip"
-        
-        # 2. Cream fisierul (Folosim formatul de array cu obiect)
-        echo "[{\"build_id\":\"$BUILD_ID\", \"download_url\":\"$$MY_LINK\"}]" > history.json
-        
-        # 3. Extragem numele si UID-ul
+        apt-get update -qq && apt-get install -y zip -qq
+        echo "=> Impachetam aplicatia..."
+        zip -j final-app.zip app/build/outputs/bundle/release/app-release.aab app/build/outputs/apk/release/app-release.apk release-key.jks
+
+  # 2. URCAM DIRECT IN FOLDERUL USERULUI (Ideea ta!)
+  - name: 'gcr.io/cloud-builders/gsutil'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Numele fisierului e "980a8021a_17713500.zip"
         MY_FILENAME=`basename "$_OBJECT"`
+        
+        # Taiem UID-ul (tot ce e inainte de primul underscore)
         MY_UID=`echo "$$MY_FILENAME" | cut -d'_' -f1`
         
-        echo "=> Se va urca pentru userul: $$MY_UID"
+        # Daca din vreo eroare UID-ul e gol, il salvam in "fara_cont"
+        if [[ -z "$$MY_UID" ]]; then MY_UID="fara_cont"; fi
         
-        # 4. Upload in Storage Bucket
-        gsutil cp history.json "gs://$_OUTPUT_BUCKET/users/$$MY_UID/history_$BUILD_ID.json"
+        echo "=> Urcam APK-ul pentru userul: $$MY_UID"
         
-        echo "=> Upload istoric finalizat!"
+        # Urcam arhiva exact unde ai cerut: users/wromo_uid/APK_BUILD_ID.zip
+        gsutil cp final-app.zip "gs://$_OUTPUT_BUCKET/users/$$MY_UID/APK_$BUILD_ID.zip"
+
 options:
   logging: CLOUD_LOGGING_ONLY
-artifacts:
-  objects:
-    location: 'gs://$_OUTPUT_BUCKET/APK/$BUILD_ID/'
-    paths:
-      - final-app.zip
-options:
-  logging: CLOUD_LOGGING_ONLY
-artifacts:
-  objects:
-    location: 'gs://$_OUTPUT_BUCKET/APK/$BUILD_ID/'
-    paths:
-      - final-app.zip
+  
