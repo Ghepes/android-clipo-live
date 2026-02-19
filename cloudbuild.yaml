@@ -87,22 +87,31 @@ steps:
       - bash
       - '-c'
       - |
-        # IMPORTANT: Reinstall zip for APK packaging step
-        apt-get update -qq && apt-get install -y zip -qq
-
-        # echo "We make the final package..."
-        # Arhivăm rezultatele
-        zip -j final-app.zip \
-          app/build/outputs/bundle/release/app-release.aab \
-          app/build/outputs/apk/release/app-release.apk \
-          release-key.jks
-
+        echo "=> Incepem generarea istoricului..."
+        
+        # 1. Generam link-ul final
+        MY_LINK="https://storage.googleapis.com/$_OUTPUT_BUCKET/APK/$BUILD_ID/final-app.zip"
+        
+        # 2. Cream fisierul (Folosim formatul de array cu obiect)
+        echo "[{\"build_id\":\"$BUILD_ID\", \"download_url\":\"$$MY_LINK\"}]" > history.json
+        
+        # 3. Extragem numele si UID-ul
         MY_FILENAME=`basename "$_OBJECT"`
         MY_UID=`echo "$$MY_FILENAME" | cut -d'_' -f1`
-        MY_LINK="https://storage.googleapis.com/$_OUTPUT_BUCKET/APK/$BUILD_ID/final-app.zip"
-        echo "[{\"build_id\":\"$BUILD_ID\", \"download_url\":\"$$MY_LINK\"}]" > history.json
+        
+        echo "=> Se va urca pentru userul: $$MY_UID"
+        
+        # 4. Upload in Storage Bucket
         gsutil cp history.json "gs://$_OUTPUT_BUCKET/users/$$MY_UID/history_$BUILD_ID.json"
-
+        
+        echo "=> Upload istoric finalizat!"
+options:
+  logging: CLOUD_LOGGING_ONLY
+artifacts:
+  objects:
+    location: 'gs://$_OUTPUT_BUCKET/APK/$BUILD_ID/'
+    paths:
+      - final-app.zip
 options:
   logging: CLOUD_LOGGING_ONLY
 artifacts:
